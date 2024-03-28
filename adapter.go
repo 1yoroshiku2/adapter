@@ -90,8 +90,8 @@ type Old struct {
 func main() {
 	// 创建Kafka消费者
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "101.227.50.63:19092",
-		"group.id":          "adapter-go13",
+		"bootstrap.servers": "***",
+		"group.id":          "adapter-go",
 		"auto.offset.reset": "earliest",
 	})
 	if err != nil {
