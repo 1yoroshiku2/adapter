@@ -12,28 +12,28 @@ import (
 )
 
 type Data struct {
-	Data1            []Data1   `json:"data"`
-	Database         string    `json:"database"`
-	Es               int       `json:"es"`
-	Id               int       `json:"id"`
-	IsDdl            bool      `json:"isDdl"`
-	MysqlType        MysqlType `json:"mysqlType"`
-	Old              []Old     `json:"old"`
-	PkNames          []string  `json:"pkNames"`
-	PrivatizeByCanal string    `json:"privatizeByCanal"`
-	Sql              string    `json:"sql"`
-	SqlType          SqlType   `json:"sqlType"`
-	Table            string    `json:"table"`
-	TenantByCanal    string    `json:"tenantByCanal"`
-	Ts               int       `json:"ts"`
-	Type             string    `json:"type"`
+	Data             []map[string]interface{} `json:"data"`
+	Database         string                   `json:"database"`
+	Es               int                      `json:"es"`
+	Id               string                   `json:"id"`
+	IsDdl            bool                     `json:"isDdl"`
+	MysqlType        MysqlType                `json:"mysqlType"`
+	Old              []Old                    `json:"old"`
+	PkNames          []string                 `json:"pkNames"`
+	PrivatizeByCanal string                   `json:"privatizeByCanal"`
+	Sql              string                   `json:"sql"`
+	SqlType          SqlType                  `json:"sqlType"`
+	Table            string                   `json:"table"`
+	TenantByCanal    string                   `json:"tenantByCanal"`
+	Ts               int                      `json:"ts"`
+	Type             string                   `json:"type"`
 }
 
-type Data1 struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
-	Age  string `json:"age"`
-}
+// type Data1 struct {
+// 	Id   string `json:"id"`
+// 	Name string `json:"name"`
+// 	Age  string `json:"age"`
+// }
 
 type SqlType struct {
 	Id   int `json:"id"`
@@ -90,8 +90,8 @@ type Old struct {
 func main() {
 	// 创建Kafka消费者
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "101.227.50.63:19092",
-		"group.id":          "adapter-go13",
+		"bootstrap.servers": "61.171.79.185:19092",
+		"group.id":          "adapter-go1",
 		"auto.offset.reset": "earliest",
 	})
 	if err != nil {
@@ -99,7 +99,7 @@ func main() {
 	}
 
 	// 订阅Kafka主题
-	err = consumer.SubscribeTopics([]string{"rds_test_canal_test_t_user_test"}, nil)
+	err = consumer.SubscribeTopics([]string{"rds_electronic_invoice_pf_lot_ei_order"}, nil)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to Kafka topic: %v", err)
 	}
@@ -136,42 +136,36 @@ func main() {
 
 				switch data.Type {
 				case "INSERT":
+					// 执行插入操作
 					err = insertData(db, data)
 					if err != nil {
 						log.Printf("Failed to insert data to MySQL: %v", err)
 						continue
 					}
-					//fmt.Println(":", data)
 
-					log.Printf("已%v一条数据，数据为: %v", data.Type, data.Data1)
 				case "UPDATE":
 					// 执行更新操作
-					// 根据data的其他字段构建更新语句，并执行db.Exec()方法
-					// 示例： db.Exec("UPDATE table SET column1 = ?, column2 = ? WHERE primary_key = ?", value1, value2, primaryKey)
 					err = updateData(db, data)
 					if err != nil {
 						log.Printf("Failed to update data to MySQL: %v", err)
 						continue
 					}
-					log.Printf("已%v一条数据，数据为: %v", data.Type, data.Data1)
 				case "DELETE":
 					// 执行删除操作
-					// 根据data的其他字段构建删除语句，并执行db.Exec()方法
-					// 示例： db.Exec("DELETE FROM table WHERE primary_key = ?", primaryKey)
-					stmt, err := db.Prepare("DELETE FROM test_t_user_test WHERE id = ?")
+					err = DeleteData(db, data)
 					if err != nil {
-						// 处理错误
+						log.Printf("Failed to delete data to MySQL: %v", err)
+						continue
 					}
-					for _, data_del := range data.Data1 {
-						_, err := stmt.Exec(data_del.Id)
-						if err != nil {
-							// 处理错误
-						}
+				case "ALTER":
+					// 执行修改操作
+					err = AlertData(db, data)
+					if err != nil {
+						log.Printf("Failed to alert data to MySQL: %v", err)
+						continue
 					}
-
-					log.Printf("已%v一条数据，数据为: %v", data.Type, data.Data1)
 				default:
-					fmt.Println("出错啦！")
+					fmt.Println("未知操作数据库类型！")
 				}
 			}
 		}()
@@ -187,20 +181,93 @@ func main() {
 
 func insertData(db *sql.DB, data Data) error {
 	// 执行插入操作，将数据插入到MySQL表中
-	_, err := db.Exec("INSERT INTO hss.test_t_user_test (id,name,age) VALUES (?, ?, ?)", data.Data1[0].Id, data.Data1[0].Name, data.Data1[0].Age)
+	query1 := "INSERT INTO"
+	query2 := "("
+	query3 := data.Table
+	query := query1 + " " + query3 + query2
+	values := "VALUES ("
+	var args []interface{}
+	for key, value := range data.Data[0] {
+		query += key + ","
+		values += "?,"
+		args = append(args, value)
+	}
+	query = query[:len(query)-1] + ")"
+	values = values[:len(values)-1] + ")"
+	query += " " + values
+
+	// 执行插入语句
+	_, err := db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to insert data to MySQL: %v", err)
+		log.Fatal(err)
+	}
+	log.Printf("数据插入: %v %v", query, args)
+	return nil
+}
+
+func DeleteData(db *sql.DB, data Data) error {
+	// 执行插入操作，将数据插入到MySQL表中
+	query1 := "DELETE FROM"
+	query2 := "WHERE "
+	query3 := data.Table
+	query := query1 + " " + query3 + " " + query2
+	var args1 []interface{}
+	for key, value := range data.Data[0] {
+		if key == data.PkNames[0] {
+			query += fmt.Sprintf("%v=?", key)
+			args1 = append(args1, value)
+
+		}
+
+	}
+	// 执行更新语句
+	_, err := db.Exec(query, args1...)
+	if err != nil {
+		log.Fatal(err)
 	}
 
+	log.Printf("数据删除: %v %v", query, args1)
 	return nil
 }
 
 func updateData(db *sql.DB, data Data) error {
 	// 执行插入操作，将数据插入到MySQL表中
-	_, err := db.Exec("UPDATE test_t_user_test SET name = ?, age = ? WHERE id = ?", data.Data1[0].Name, data.Data1[0].Age, data.Data1[0].Id)
+	query1 := "UPDATE"
+	query2 := "SET"
+	query3 := data.Table
+	query := query1 + " " + query3 + " " + query2 + " "
+	var args []interface{}
+	var args1 []interface{}
+	for key, value := range data.Data[0] {
+		query += fmt.Sprintf("%v=?,", key)
+		args = append(args, value)
+		if key == data.PkNames[0] {
+			args1 = append(args1, value)
+
+		}
+
+	}
+	query = query[:len(query)-1] + " " + "WHERE" + " " + data.PkNames[0] + " = ?"
+	args = append(args, args1[0])
+	// 执行更新语句
+	_, err := db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update data to MySQL: %v", err)
+		log.Fatal(err)
 	}
 
+	log.Printf("数据更新: %v %v", query, args)
+	return nil
+}
+
+func AlertData(db *sql.DB, data Data) error {
+	// 执行插入操作，将数据插入到MySQL表中
+
+	// 执行更新语句
+	_, err := db.Exec(data.Sql)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("修改字段: %v", data.Sql)
 	return nil
 }
