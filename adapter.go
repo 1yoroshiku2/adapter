@@ -90,7 +90,7 @@ type Old struct {
 func main() {
 	// 创建Kafka消费者
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "61.171.79.185:19092",
+		"bootstrap.servers": "*:9092",
 		"group.id":          "adapter-go1",
 		"auto.offset.reset": "earliest",
 	})
@@ -99,7 +99,7 @@ func main() {
 	}
 
 	// 订阅Kafka主题
-	err = consumer.SubscribeTopics([]string{"rds_electronic_invoice_pf_lot_ei_order"}, nil)
+	err = consumer.SubscribeTopics([]string{"topicname"}, nil)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to Kafka topic: %v", err)
 	}
@@ -108,7 +108,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	// 创建MySQL连接
-	db, err := sql.Open("mysql", "root:chengdu#KT2020@tcp(192.168.0.163:3306)/hss")
+	db, err := sql.Open("mysql", "root:passwd@tcp(*:3306)/hss")
 	if err != nil {
 		log.Fatalf("Failed to connect to MySQL: %v", err)
 	}
